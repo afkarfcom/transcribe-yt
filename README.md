@@ -82,18 +82,37 @@ Contoh respons JSON:
 
 Respons di-cache di edge Vercel selama 24 jam (`s-maxage=86400`), jadi video yang sama tidak di-fetch berulang kali.
 
-## ⚠️ Catatan: YouTube memblokir IP server
+## ⚠️ Kalau YouTube memblokir server (error "confirm you're not a bot")
 
-YouTube kadang memblokir request dari IP cloud/datacenter (termasuk Vercel). Tandanya muncul error seperti
-_"YouTube memblokir request dari server ini"_ atau _"confirm you're not a bot"_.
+YouTube sering memblokir request dari IP cloud/datacenter (termasuk Vercel). Aplikasi ini sudah otomatis mencoba
+beberapa cara secara berurutan (halaman video → klien *embedded*/TV/Android/iOS/mobile → endpoint panel transkrip).
+Kalau semuanya tetap diblokir, pilih salah satu (atau keduanya) di **Vercel → Project → Settings → Environment Variables**, lalu **Redeploy**:
 
-Solusinya: pakai proxy (sebaiknya **residential proxy**). Di Vercel → **Project → Settings → Environment Variables**, tambahkan:
+### Opsi A — Proxy (paling andal)
 
 ```
 TRANSCRIPT_PROXY_URL=http://user:pass@host:port
 ```
 
-lalu redeploy. Semua request ke YouTube akan lewat proxy tersebut. Lihat `.env.example`.
+Semua request ke YouTube akan lewat proxy ini. Sebaiknya pakai **residential proxy** (misalnya Webshare, IPRoyal, Smartproxy, dan sejenisnya), karena proxy datacenter biasanya juga diblokir.
+
+### Opsi B — Cookie akun YouTube (gratis)
+
+```
+YOUTUBE_COOKIE=SID=...; HSID=...; SSID=...; APISID=...; SAPISID=...; __Secure-3PSID=...
+```
+
+Cara ambil:
+1. Login ke youtube.com di browser (**sebaiknya akun cadangan**, bukan akun utama).
+2. Buka DevTools (F12) → tab **Network** → refresh halaman → klik request `www.youtube.com`.
+3. Di **Request Headers**, salin seluruh isi header `cookie`, lalu tempel sebagai nilai `YOUTUBE_COOKIE`.
+
+Cookie bisa kedaluwarsa. Kalau error muncul lagi, ulangi langkah di atas.
+
+### Tips tambahan
+
+- Ganti region function Vercel (**Settings → Functions → Function Region**), misalnya ke `sin1` (Singapura). Region tertentu kadang lebih jarang diblokir.
+- Saat dijalankan di komputer sendiri (`npm run dev`), aplikasi biasanya langsung jalan tanpa proxy karena memakai IP rumah.
 
 ## 🗂️ Struktur
 
@@ -112,9 +131,10 @@ public/icon.svg
 ## ⚙️ Cara kerja
 
 1. Ambil halaman video untuk mendapatkan metadata & API key Innertube.
-2. Panggil endpoint `youtubei/v1/player` (klien Android/iOS) untuk daftar caption; jika gagal, pakai data dari halaman.
-3. Unduh caption XML, parsing (format klasik & srv3), bersihkan HTML entities.
-4. Format ulang sesuai permintaan (JSON/TXT/SRT/VTT/MD).
+2. Coba daftar caption dari halaman video, lalu dari endpoint `youtubei/v1/player` dengan beberapa klien (embedded, TV, Android, iOS, mobile web).
+3. Jika semuanya gagal, pakai endpoint panel "Show transcript" (`youtubei/v1/get_transcript`).
+4. Unduh caption XML, parsing (format klasik & srv3), bersihkan HTML entities.
+5. Format ulang sesuai permintaan (JSON/TXT/SRT/VTT/MD).
 
 Hanya video yang memiliki subtitle (manual atau otomatis) yang bisa ditranskrip.
 
